@@ -1,8 +1,12 @@
 /**
  * Admin Authentication Utilities
  *
- * Uses HMAC-SHA256 signed session cookie based on ADMIN_SECRET.
- * Works both in Node.js API routes and Edge Runtime (middleware).
+ * Uses HMAC-SHA256 signed session cookie keyed with SESSION_SECRET.
+ * Credentials (username + password) are checked against ADMIN_USERNAME
+ * and ADMIN_PASSWORD — these are intentionally separate from the session
+ * signing secret so a compromised credential cannot forge session tokens.
+ *
+ * Works in both Node.js API routes and Edge Runtime (middleware).
  */
 
 import { type NextRequest, NextResponse } from 'next/server'
@@ -15,9 +19,10 @@ const MAX_AGE = 60 * 60 * 24 // 24 hours
 // Helpers — Web Crypto API (works in both Node.js and Edge runtimes)
 // ---------------------------------------------------------------------------
 
-function getSecret(): string {
-  const secret = process.env.ADMIN_SECRET
-  if (!secret) throw new Error('ADMIN_SECRET is not configured')
+/** Returns the secret used exclusively for HMAC session signing. */
+function getSessionSecret(): string {
+  const secret = process.env.SESSION_SECRET
+  if (!secret) throw new Error('SESSION_SECRET is not configured')
   return secret
 }
 
@@ -39,10 +44,20 @@ async function hmacSign(payload: string, secret: string): Promise<string> {
 async function hmacVerify(payload: string, signature: string, secret: string): Promise<boolean> {
   const expected = await hmacSign(payload, secret)
   if (expected.length !== signature.length) return false
-  // Constant-time comparison
+  // Constant-time comparison — prevents timing attacks
   let result = 0
   for (let i = 0; i < expected.length; i++) {
     result |= expected.charCodeAt(i) ^ signature.charCodeAt(i)
+  }
+  return result === 0
+}
+
+/** Constant-time string equality — prevents timing-based enumeration. */
+function safeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false
+  let result = 0
+  for (let i = 0; i < a.length; i++) {
+    result |= a.charCodeAt(i) ^ b.charCodeAt(i)
   }
   return result === 0
 }
@@ -51,15 +66,15 @@ async function hmacVerify(payload: string, signature: string, secret: string): P
 // Public API
 // ---------------------------------------------------------------------------
 
-/** Create the session token (HMAC of fixed payload). */
+/** Create the session token (HMAC of fixed payload signed with SESSION_SECRET). */
 export async function createSessionToken(): Promise<string> {
-  return hmacSign(SESSION_PAYLOAD, getSecret())
+  return hmacSign(SESSION_PAYLOAD, getSessionSecret())
 }
 
 /** Verify a session token string. */
 export async function verifySessionToken(token: string): Promise<boolean> {
   try {
-    return await hmacVerify(SESSION_PAYLOAD, token, getSecret())
+    return await hmacVerify(SESSION_PAYLOAD, token, getSessionSecret())
   } catch {
     return false
   }
@@ -95,14 +110,17 @@ export function clearAdminSession(response: NextResponse): void {
   })
 }
 
-/** Verify admin password (constant-time comparison). */
-export function verifyPassword(password: string): boolean {
-  const secret = process.env.ADMIN_SECRET
-  if (!secret) return false
-  if (secret.length !== password.length) return false
-  let result = 0
-  for (let i = 0; i < secret.length; i++) {
-    result |= secret.charCodeAt(i) ^ password.charCodeAt(i)
-  }
-  return result === 0
+/**
+ * Verify admin credentials (username + password) using constant-time comparison.
+ * Both fields are checked regardless of which one fails to avoid timing oracle attacks.
+ * Returns false (not throws) on any missing config so the login route can handle it safely.
+ */
+export function verifyCredentials(username: string, password: string): boolean {
+  const expectedUsername = process.env.ADMIN_USERNAME
+  const expectedPassword = process.env.ADMIN_PASSWORD
+  if (!expectedUsername || !expectedPassword) return false
+  const usernameOk = safeEqual(username, expectedUsername)
+  const passwordOk = safeEqual(password, expectedPassword)
+  // Both checks are always evaluated — no short-circuit to prevent timing leaks
+  return usernameOk && passwordOk
 }
