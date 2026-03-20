@@ -3,7 +3,7 @@
 import { useState, type FormEvent } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
-import { LockIcon, UserIcon } from 'lucide-react'
+import { EyeIcon, EyeOffIcon, LockIcon, UserIcon } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -13,6 +13,7 @@ export default function LoginPage() {
   const router = useRouter()
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -76,14 +77,22 @@ export default function LoginPage() {
               <div className="relative">
                 <LockIcon className="text-muted-foreground absolute left-3 top-1/2 size-4 -translate-y-1/2" />
                 <Input
-                  type="password"
+                  type={showPassword ? 'text' : 'password'}
                   placeholder="Password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="pl-9"
+                  className="pl-9 pr-10"
                   autoComplete="current-password"
                   required
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((current) => !current)}
+                  className="text-muted-foreground hover:text-foreground absolute right-3 top-1/2 -translate-y-1/2"
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showPassword ? <EyeOffIcon className="size-4" /> : <EyeIcon className="size-4" />}
+                </button>
               </div>
             </div>
             {error && (
