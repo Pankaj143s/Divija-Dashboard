@@ -1,4 +1,4 @@
-import { IndianRupeeIcon, HashIcon, CalendarIcon, TrendingUpIcon } from 'lucide-react'
+import { IndianRupeeIcon, HashIcon, ClockIcon, RotateCcwIcon } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import type { DashboardStats, DashboardRangeStats } from '@/lib/admin-types'
@@ -37,60 +37,62 @@ export function StatsCards({ statsAllTime, statsRange, hasDateFilter, loading }:
     )
   }
 
+  const rangeLabel = hasDateFilter ? 'Range' : 'All-Time'
+
   return (
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-      {/* All-Time Amount */}
+      {/* Total Collected */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between pb-2">
-          <CardTitle className="text-sm font-medium text-muted-foreground">All-Time Amount</CardTitle>
+          <CardTitle className="text-sm font-medium text-muted-foreground">Total Collected</CardTitle>
           <IndianRupeeIcon className="size-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold">{formatINR(statsAllTime?.amount ?? 0)}</div>
-          <p className="text-xs text-muted-foreground">Total successful donations</p>
-        </CardContent>
-      </Card>
-
-      {/* All-Time Count */}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between pb-2">
-          <CardTitle className="text-sm font-medium text-muted-foreground">All-Time Count</CardTitle>
-          <HashIcon className="size-4 text-muted-foreground" />
-        </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold">{statsAllTime?.count ?? 0}</div>
-          <p className="text-xs text-muted-foreground">Successful donations</p>
-        </CardContent>
-      </Card>
-
-      {/* Range Amount */}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between pb-2">
-          <CardTitle className="text-sm font-medium text-muted-foreground">
-            {hasDateFilter ? 'Range Amount' : 'All Amount'}
-          </CardTitle>
-          <TrendingUpIcon className="size-4 text-muted-foreground" />
-        </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold">{formatINR(statsRange?.amount ?? 0)}</div>
+          <div className="text-2xl font-bold">{formatINR(statsRange?.amount ?? statsAllTime?.amount ?? 0)}</div>
           <p className="text-xs text-muted-foreground">
-            {statsRange?.count ?? 0} successful of {statsRange?.totalCount ?? 0} total
+            {rangeLabel} · {statsRange?.count ?? statsAllTime?.count ?? 0} successful
           </p>
         </CardContent>
       </Card>
 
-      {/* Range Count */}
+      {/* Total Donations */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between pb-2">
-          <CardTitle className="text-sm font-medium text-muted-foreground">
-            {hasDateFilter ? 'Range Donations' : 'All Donations'}
-          </CardTitle>
-          <CalendarIcon className="size-4 text-muted-foreground" />
+          <CardTitle className="text-sm font-medium text-muted-foreground">Total Donations</CardTitle>
+          <HashIcon className="size-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold">{statsRange?.totalCount ?? 0}</div>
           <p className="text-xs text-muted-foreground">
-            {statsRange?.count ?? 0} successful
+            {rangeLabel} · all statuses
+          </p>
+        </CardContent>
+      </Card>
+
+      {/* Pending */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between pb-2">
+          <CardTitle className="text-sm font-medium text-muted-foreground">Pending</CardTitle>
+          <ClockIcon className="size-4 text-yellow-500" />
+        </CardHeader>
+        <CardContent>
+          <div className="text-2xl font-bold">{statsRange?.pendingCount ?? 0}</div>
+          <p className="text-xs text-muted-foreground">
+            {rangeLabel} · awaiting payment
+          </p>
+        </CardContent>
+      </Card>
+
+      {/* Refunded */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between pb-2">
+          <CardTitle className="text-sm font-medium text-muted-foreground">Refunded</CardTitle>
+          <RotateCcwIcon className="size-4 text-blue-500" />
+        </CardHeader>
+        <CardContent>
+          <div className="text-2xl font-bold">{formatINR(statsRange?.refundedAmount ?? 0)}</div>
+          <p className="text-xs text-muted-foreground">
+            {rangeLabel} · {statsRange?.refundedCount ?? 0} refunded
           </p>
         </CardContent>
       </Card>

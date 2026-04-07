@@ -38,6 +38,9 @@ export interface DashboardStats {
 
 export interface DashboardRangeStats extends DashboardStats {
   totalCount: number
+  pendingCount: number
+  refundedCount: number
+  refundedAmount: number
 }
 
 export interface PaginationInfo {

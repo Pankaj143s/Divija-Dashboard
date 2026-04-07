@@ -20,7 +20,7 @@ import { isAdminAuthenticated } from '@/lib/admin-auth'
 import { supabaseAdmin } from '@/lib/supabase'
 import type { ExportMode } from '@/lib/admin-types'
 
-const ALLOWED_STATUSES = ['success', 'pending', 'abandoned']
+const ALLOWED_STATUSES = ['success', 'pending', 'abandoned', 'failed', 'refunded']
 const STATUS_FILL: Record<string, string> = {
   success: 'FFD1FAE5',
   pending: 'FFFFF3BF',

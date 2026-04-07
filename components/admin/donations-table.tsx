@@ -1,7 +1,16 @@
 'use client'
 
+import { useState } from 'react'
 import { format } from 'date-fns'
-import { FileCheckIcon, FileTextIcon, HeartIcon } from 'lucide-react'
+import {
+  FileCheckIcon,
+  FileTextIcon,
+  HeartIcon,
+  ChevronDownIcon,
+  ChevronRightIcon,
+  RotateCcwIcon,
+  BanIcon,
+} from 'lucide-react'
 
 import {
   Table,
@@ -12,6 +21,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { StatusBadge } from '@/components/admin/status-badge'
 import type { DonationRow } from '@/lib/admin-types'
@@ -24,38 +34,21 @@ function formatINR(amount: number): string {
   }).format(amount)
 }
 
-function formatDateLines(iso: string): [string, string] {
+function formatDate(iso: string): string {
   try {
-    return [
-      format(new Date(iso), 'dd MMM yyyy'),
-      format(new Date(iso), 'hh:mm a'),
-    ]
+    return format(new Date(iso), 'dd MMM yyyy, hh:mm a')
   } catch {
-    return [iso, '']
+    return iso
   }
 }
 
-function formatAddressLines(row: DonationRow): string[] {
+function formatAddressLines(row: DonationRow): string {
   if (row.street_address || row.city || row.state || row.pincode || row.country) {
-    const line1 = row.street_address?.trim()
-    const line2 = [row.city, row.state, row.pincode].filter(Boolean).join(', ').trim()
-    const line3 = row.country?.trim()
-    return [line1, line2, line3].filter(Boolean) as string[]
+    return [row.street_address, row.city, row.state, row.pincode, row.country]
+      .filter(Boolean)
+      .join(', ')
   }
-
-  const raw = (row.address || '').trim()
-  if (!raw) return ['—']
-
-  const split = raw
-    .split(',')
-    .map((part) => part.trim())
-    .filter(Boolean)
-
-  if (split.length <= 1) return [raw]
-
-  const firstLine = split.slice(0, Math.ceil(split.length / 2)).join(', ')
-  const secondLine = split.slice(Math.ceil(split.length / 2)).join(', ')
-  return [firstLine, secondLine].filter(Boolean)
+  return row.address || '—'
 }
 
 function normalizeCommStatus(value: string | null | undefined, sentFlag: boolean | null | undefined): string {
@@ -83,6 +76,15 @@ function CommStatusBadge({ status }: { status: string }) {
   )
 }
 
+function isSafeUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url)
+    return parsed.protocol === 'https:' || parsed.protocol === 'http:'
+  } catch {
+    return false
+  }
+}
+
 function DocLink({
   url,
   label,
@@ -92,23 +94,15 @@ function DocLink({
   label: string
   icon: React.ComponentType<{ className?: string }>
 }) {
-  if (!url) {
-    return (
-      <div className="text-muted-foreground flex min-w-[38px] flex-col items-center gap-1 text-[10px] leading-3">
-        <Icon className="size-3.5 opacity-50" />
-        <span>{label}</span>
-      </div>
-    )
-  }
+  if (!url || !isSafeUrl(url)) return null
 
   return (
     <a
       href={url}
       target="_blank"
       rel="noopener noreferrer"
-      className="text-primary inline-flex min-w-[38px] flex-col items-center gap-1 text-[10px] leading-3 hover:underline"
+      className="text-primary inline-flex items-center gap-1 text-xs hover:underline"
       title={`Open ${label}`}
-      download
     >
       <Icon className="size-3.5" />
       <span>{label}</span>
@@ -116,36 +110,47 @@ function DocLink({
   )
 }
 
+function DocIconLink({ url, label, icon: Icon }: { url: string | null; label: string; icon: React.ComponentType<{ className?: string }> }) {
+  if (!url || !isSafeUrl(url)) return null
+  return (
+    <a
+      href={url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="text-primary hover:text-primary/80"
+      title={label}
+      onClick={(e) => e.stopPropagation()}
+    >
+      <Icon className="size-3.5" />
+    </a>
+  )
+}
+
 interface DonationsTableProps {
   rows: DonationRow[]
   loading: boolean
+  onAction?: (action: string, donationId: string) => void
 }
 
-export function DonationsTable({ rows, loading }: DonationsTableProps) {
-  const stickyHeaderBase = 'sticky bg-background'
-  const stickyCellBase = 'sticky bg-background'
+export function DonationsTable({ rows, loading, onAction }: DonationsTableProps) {
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
+
+  function toggleExpand(id: string) {
+    setExpandedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
 
   if (loading) {
     return (
       <div className="overflow-x-auto rounded-md border">
-        <Table className="min-w-[1900px] table-fixed">
+        <Table>
           <TableHeader>
             <TableRow>
-              {[
-                'Sr No.',
-                'Receipt #',
-                'Date / Time',
-                'Name',
-                'Donor Email',
-                'Phone',
-                'PAN',
-                'Address',
-                'Amount',
-                'Payment Status',
-                'Email Delivery',
-                'WhatsApp Delivery',
-                'Payment ID',
-              ].map((h) => (
+              {['', 'Receipt #', 'Date', 'Donor', 'Amount', 'Status', 'Docs', 'Delivery'].map((h) => (
                 <TableHead key={h}>{h}</TableHead>
               ))}
             </TableRow>
@@ -153,7 +158,7 @@ export function DonationsTable({ rows, loading }: DonationsTableProps) {
           <TableBody>
             {Array.from({ length: 8 }).map((_, i) => (
               <TableRow key={i}>
-                {Array.from({ length: 13 }).map((_, j) => (
+                {Array.from({ length: 8 }).map((_, j) => (
                   <TableCell key={j}>
                     <Skeleton className="h-4 w-20" />
                   </TableCell>
@@ -176,86 +181,152 @@ export function DonationsTable({ rows, loading }: DonationsTableProps) {
 
   return (
     <div className="overflow-x-auto rounded-md border">
-      <Table className="min-w-[1900px] table-fixed">
+      <Table>
         <TableHeader>
           <TableRow>
-            <TableHead className={`${stickyHeaderBase} left-0 z-40 w-[70px] text-center`}>Sr No.</TableHead>
-            <TableHead className={`${stickyHeaderBase} left-[70px] z-40 w-[220px]`}>Receipt #</TableHead>
-            <TableHead className={`${stickyHeaderBase} left-[290px] z-40 w-[170px]`}>Date / Time</TableHead>
-            <TableHead className={`${stickyHeaderBase} left-[460px] z-40 w-[220px]`}>Name</TableHead>
-            <TableHead className="w-[14%]">Donor Email</TableHead>
-            <TableHead className="w-[9%]">Phone</TableHead>
-            <TableHead className="w-[8%]">PAN</TableHead>
-            <TableHead className="w-[15%]">Address</TableHead>
-            <TableHead className="w-[7%] text-right">Amount</TableHead>
-            <TableHead className="w-[8%]">Payment Status</TableHead>
-            <TableHead className="w-[8%]">Email Delivery</TableHead>
-            <TableHead className="w-[9%]">WhatsApp Delivery</TableHead>
-            <TableHead className="w-[10%]">Payment ID</TableHead>
+            <TableHead className="w-8" />
+            <TableHead>Receipt #</TableHead>
+            <TableHead>Date</TableHead>
+            <TableHead>Donor</TableHead>
+            <TableHead className="text-right">Amount</TableHead>
+            <TableHead>Status</TableHead>
+            <TableHead>Docs</TableHead>
+            <TableHead>Delivery</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {rows.map((row, index) => (
-            <TableRow key={row.id}>
-              <TableCell className={`${stickyCellBase} left-0 z-30 w-[70px] align-top text-center text-xs font-medium tabular-nums`}>
-                {index + 1}
-              </TableCell>
-              <TableCell className={`${stickyCellBase} left-[70px] z-30 w-[220px] align-top text-xs`}>
-                <p className="font-mono whitespace-normal break-all">{row.receipt_number || '—'}</p>
-                <div className="mt-2 flex items-start gap-2">
-                  <DocLink url={row.receipt_url} label="Receipt" icon={FileTextIcon} />
-                  <DocLink url={row.itr80g_url} label="80G" icon={FileCheckIcon} />
-                  <DocLink url={row.thanking_letter_url} label="Letter" icon={HeartIcon} />
-                </div>
-              </TableCell>
-              <TableCell className={`${stickyCellBase} left-[290px] z-30 w-[170px] align-top text-xs`}>
-                <div className="leading-4">
-                  <p>{formatDateLines(row.created_at)[0]}</p>
-                  <p className="text-muted-foreground">{formatDateLines(row.created_at)[1]}</p>
-                </div>
-              </TableCell>
-              <TableCell className={`${stickyCellBase} left-[460px] z-30 w-[220px] align-top text-xs`}>
-                <p className="font-medium whitespace-normal break-words">{row.name}</p>
-              </TableCell>
-              <TableCell className="align-top text-xs">
-                <p className="whitespace-normal break-all leading-4">{row.email}</p>
-              </TableCell>
-              <TableCell className="align-top text-xs">
-                <p className="mt-1 whitespace-normal break-all">{row.phone}</p>
-              </TableCell>
-              <TableCell className="align-top text-xs">
-                <p className="mt-1 font-mono uppercase whitespace-nowrap">{row.pan_number || '—'}</p>
-              </TableCell>
-              <TableCell className="align-top text-xs">
-                <div className="space-y-0.5 whitespace-normal break-all leading-4">
-                  {formatAddressLines(row).map((line, addressIndex) => (
-                    <p key={`${row.id}-addr-${addressIndex}`}>{line}</p>
-                  ))}
-                </div>
-              </TableCell>
-              <TableCell className="align-top text-xs">
-                <p className="text-right font-medium tabular-nums">{formatINR(row.amount)}</p>
-              </TableCell>
-              <TableCell className="align-top text-xs">
-                <StatusBadge status={row.status} />
-              </TableCell>
-              <TableCell className="align-top text-xs">
-                <CommStatusBadge
-                  status={normalizeCommStatus(row.donor_email_status, row.email_sent)}
-                />
-              </TableCell>
-              <TableCell className="align-top text-xs">
-                <CommStatusBadge
-                  status={normalizeCommStatus(row.donor_whatsapp_status, row.whatsapp_sent)}
-                />
-              </TableCell>
-              <TableCell className="align-top text-xs">
-                <p className="font-mono text-[11px] whitespace-normal break-all">
-                  {row.razorpay_payment_id || '—'}
-                </p>
-              </TableCell>
-            </TableRow>
-          ))}
+          {rows.map((row) => {
+            const isExpanded = expandedIds.has(row.id)
+            return (
+              <>
+                {/* Summary row */}
+                <TableRow
+                  key={row.id}
+                  className="cursor-pointer hover:bg-muted/50"
+                  onClick={() => toggleExpand(row.id)}
+                >
+                  <TableCell className="w-8 px-2">
+                    {isExpanded ? (
+                      <ChevronDownIcon className="size-4 text-muted-foreground" />
+                    ) : (
+                      <ChevronRightIcon className="size-4 text-muted-foreground" />
+                    )}
+                  </TableCell>
+                  <TableCell className="text-xs">
+                    <span className="font-mono">{row.receipt_number || '—'}</span>
+                  </TableCell>
+                  <TableCell className="text-xs whitespace-nowrap">
+                    {formatDate(row.created_at)}
+                  </TableCell>
+                  <TableCell className="text-xs">
+                    <p className="font-medium">{row.name}</p>
+                    <p className="text-muted-foreground">{row.email}</p>
+                  </TableCell>
+                  <TableCell className="text-right text-xs font-medium tabular-nums">
+                    {formatINR(row.amount)}
+                  </TableCell>
+                  <TableCell className="text-xs">
+                    <StatusBadge status={row.status} />
+                  </TableCell>
+                  <TableCell className="text-xs">
+                    <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                      <DocIconLink url={row.receipt_url} label="Receipt" icon={FileTextIcon} />
+                      <DocIconLink url={row.itr80g_url} label="80G Certificate" icon={FileCheckIcon} />
+                      <DocIconLink url={row.thanking_letter_url} label="Thank You Letter" icon={HeartIcon} />
+                      {!row.receipt_url && !row.itr80g_url && !row.thanking_letter_url && (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-xs">
+                    <div className="flex items-center gap-2">
+                      <span title="Email">
+                        <CommStatusBadge
+                          status={normalizeCommStatus(row.donor_email_status, row.email_sent)}
+                        />
+                      </span>
+                      <span title="WhatsApp">
+                        <CommStatusBadge
+                          status={normalizeCommStatus(row.donor_whatsapp_status, row.whatsapp_sent)}
+                        />
+                      </span>
+                    </div>
+                  </TableCell>
+                </TableRow>
+
+                {/* Expanded detail row */}
+                {isExpanded && (
+                  <TableRow key={`${row.id}-detail`} className="bg-muted/30 hover:bg-muted/30">
+                    <TableCell colSpan={8} className="p-4">
+                      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                        {/* Contact */}
+                        <div className="space-y-1 text-sm">
+                          <p className="text-xs font-semibold text-muted-foreground uppercase">Contact</p>
+                          <p>Phone: {row.phone}</p>
+                          <p>PAN: <span className="font-mono uppercase">{row.pan_number || '—'}</span></p>
+                          <p>Address: {formatAddressLines(row)}</p>
+                        </div>
+
+                        {/* Payment */}
+                        <div className="space-y-1 text-sm">
+                          <p className="text-xs font-semibold text-muted-foreground uppercase">Payment</p>
+                          <p>ID: <span className="font-mono text-xs break-all">{row.razorpay_payment_id || '—'}</span></p>
+                          <p>Method: {row.payment_method || '—'}</p>
+                        </div>
+
+                        {/* Documents */}
+                        <div className="space-y-1 text-sm">
+                          <p className="text-xs font-semibold text-muted-foreground uppercase">Documents</p>
+                          <div className="flex flex-wrap gap-3">
+                            <DocLink url={row.receipt_url} label="Receipt" icon={FileTextIcon} />
+                            <DocLink url={row.itr80g_url} label="80G Certificate" icon={FileCheckIcon} />
+                            <DocLink url={row.thanking_letter_url} label="Thank You Letter" icon={HeartIcon} />
+                            {!row.receipt_url && !row.itr80g_url && !row.thanking_letter_url && (
+                              <span className="text-xs text-muted-foreground">No documents</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Row actions */}
+                      {onAction && (row.status === 'success' || row.status === 'pending') && (
+                        <div className="mt-4 flex gap-2 border-t pt-3">
+                          {row.status === 'success' && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="gap-1.5 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                onAction('mark_refunded', row.id)
+                              }}
+                            >
+                              <RotateCcwIcon className="size-3.5" />
+                              Mark Refunded
+                            </Button>
+                          )}
+                          {row.status === 'pending' && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="gap-1.5 text-gray-600 hover:text-gray-700 hover:bg-gray-50"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                onAction('mark_abandoned', row.id)
+                              }}
+                            >
+                              <BanIcon className="size-3.5" />
+                              Mark Abandoned
+                            </Button>
+                          )}
+                        </div>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                )}
+              </>
+            )
+          })}
         </TableBody>
       </Table>
     </div>

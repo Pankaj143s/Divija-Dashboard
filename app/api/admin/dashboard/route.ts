@@ -11,7 +11,7 @@ import { isAdminAuthenticated } from '@/lib/admin-auth'
 import { supabaseAdmin } from '@/lib/supabase'
 import type { DashboardResponse, DonationRow } from '@/lib/admin-types'
 
-const ALLOWED_STATUSES = ['success', 'pending', 'abandoned']
+const ALLOWED_STATUSES = ['success', 'pending', 'abandoned', 'failed', 'refunded']
 
 const SELECT_COLUMNS = [
   'id',
@@ -119,38 +119,30 @@ export async function GET(request: NextRequest) {
     }
 
     // -----------------------------------------------------------------------
-    // Stats: Selected Range
+    // Stats: Selected Range — single query, compute breakdowns in JS
     // -----------------------------------------------------------------------
-    let rangeSuccessQuery = supabaseAdmin
+    let rangeQuery = supabaseAdmin
       .from('donations')
-      .select('amount')
-      .eq('status', 'success')
-
-    let rangeTotalQuery = supabaseAdmin
-      .from('donations')
-      .select('id', { count: 'exact', head: true })
+      .select('amount,status')
 
     if (from) {
-      rangeSuccessQuery = rangeSuccessQuery.gte('created_at', `${from}T00:00:00.000Z`)
-      rangeTotalQuery = rangeTotalQuery.gte('created_at', `${from}T00:00:00.000Z`)
+      rangeQuery = rangeQuery.gte('created_at', `${from}T00:00:00.000Z`)
     }
     if (to) {
-      rangeSuccessQuery = rangeSuccessQuery.lte('created_at', `${to}T23:59:59.999Z`)
-      rangeTotalQuery = rangeTotalQuery.lte('created_at', `${to}T23:59:59.999Z`)
+      rangeQuery = rangeQuery.lte('created_at', `${to}T23:59:59.999Z`)
     }
 
-    const [rangeSuccessResult, rangeTotalResult] = await Promise.all([
-      rangeSuccessQuery,
-      rangeTotalQuery,
-    ])
+    const { data: rangeData, error: rangeError } = await rangeQuery
+    if (rangeError) throw rangeError
 
-    if (rangeSuccessResult.error) throw rangeSuccessResult.error
-    if (rangeTotalResult.error) throw rangeTotalResult.error
-
+    const rangeRows = rangeData || []
     const statsRange = {
-      amount: rangeSuccessResult.data?.reduce((sum, d) => sum + (d.amount || 0), 0) ?? 0,
-      count: rangeSuccessResult.data?.length ?? 0,
-      totalCount: rangeTotalResult.count ?? 0,
+      amount: rangeRows.filter((d) => d.status === 'success').reduce((s, d) => s + (d.amount || 0), 0),
+      count: rangeRows.filter((d) => d.status === 'success').length,
+      totalCount: rangeRows.length,
+      pendingCount: rangeRows.filter((d) => d.status === 'pending').length,
+      refundedCount: rangeRows.filter((d) => d.status === 'refunded').length,
+      refundedAmount: rangeRows.filter((d) => d.status === 'refunded').reduce((s, d) => s + (d.amount || 0), 0),
     }
 
     // -----------------------------------------------------------------------

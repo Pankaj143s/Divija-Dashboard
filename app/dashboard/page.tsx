@@ -168,6 +168,28 @@ export default function DashboardPage() {
     setFilters((prev) => ({ ...prev, page }))
   }
 
+  async function handleDonationAction(action: string, donationId: string) {
+    const label = action === 'mark_refunded' ? 'refunded' : 'abandoned'
+    if (!confirm(`Mark this donation as ${label}?`)) return
+
+    try {
+      const res = await fetch('/api/admin/donations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, donationId }),
+      })
+      if (!res.ok) {
+        const data = await res.json()
+        throw new Error(data.error || 'Action failed')
+      }
+      // Refresh data
+      hasLoadedAllTimeRef.current = false
+      fetchData(filters)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Action failed')
+    }
+  }
+
   // -------------------------------------------------------------------------
   // Export helpers
   // -------------------------------------------------------------------------
@@ -235,8 +257,16 @@ export default function DashboardPage() {
       <main className="mx-auto w-full max-w-screen-2xl flex-1 space-y-6 p-4 sm:p-6">
         {/* Error banner */}
         {error && (
-          <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800 dark:border-red-800 dark:bg-red-950/30 dark:text-red-400">
-            {error}
+          <div className="flex items-center justify-between rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800 dark:border-red-800 dark:bg-red-950/30 dark:text-red-400">
+            <span>{error}</span>
+            <Button
+              variant="outline"
+              size="sm"
+              className="ml-4 shrink-0 border-red-300 text-red-700 hover:bg-red-100 dark:border-red-700 dark:text-red-400 dark:hover:bg-red-900/30"
+              onClick={() => { setError(''); hasLoadedAllTimeRef.current = false; fetchData(filters) }}
+            >
+              Retry
+            </Button>
           </div>
         )}
 
@@ -277,6 +307,8 @@ export default function DashboardPage() {
               <SelectItem value="all">All Statuses</SelectItem>
               <SelectItem value="success">Success</SelectItem>
               <SelectItem value="pending">Pending</SelectItem>
+              <SelectItem value="failed">Failed</SelectItem>
+              <SelectItem value="refunded">Refunded</SelectItem>
               <SelectItem value="abandoned">Abandoned</SelectItem>
             </SelectContent>
           </Select>
@@ -314,7 +346,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Table */}
-        <DonationsTable rows={rows} loading={loading && rows.length === 0} />
+        <DonationsTable rows={rows} loading={loading && rows.length === 0} onAction={handleDonationAction} />
 
         {/* Pagination */}
         {pagination && pagination.pages > 1 && (
