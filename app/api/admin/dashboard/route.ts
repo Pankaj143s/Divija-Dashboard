@@ -40,6 +40,7 @@ const SELECT_COLUMNS = [
   'receipt_url',
   'itr80g_url',
   'thanking_letter_url',
+  'message',
 ].join(',')
 
 export async function GET(request: NextRequest) {

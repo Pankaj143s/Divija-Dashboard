@@ -29,6 +29,7 @@ export interface DonationRow {
   receipt_url: string | null
   itr80g_url: string | null
   thanking_letter_url: string | null
+  message: string | null
 }
 
 export interface DashboardStats {

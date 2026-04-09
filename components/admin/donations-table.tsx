@@ -10,6 +10,7 @@ import {
   ChevronRightIcon,
   RotateCcwIcon,
   BanIcon,
+  MessageSquareIcon,
 } from 'lucide-react'
 
 import {
@@ -121,7 +122,7 @@ function DocIconLink({ url, label, icon: Icon }: { url: string | null; label: st
       title={label}
       onClick={(e) => e.stopPropagation()}
     >
-      <Icon className="size-3.5" />
+      <Icon className="size-4.5" />
     </a>
   )
 }
@@ -271,7 +272,6 @@ export function DonationsTable({ rows, loading, onAction }: DonationsTableProps)
                         <div className="space-y-1 text-sm">
                           <p className="text-xs font-semibold text-muted-foreground uppercase">Payment</p>
                           <p>ID: <span className="font-mono text-xs break-all">{row.razorpay_payment_id || '—'}</span></p>
-                          <p>Method: {row.payment_method || '—'}</p>
                         </div>
 
                         {/* Documents */}
@@ -288,23 +288,20 @@ export function DonationsTable({ rows, loading, onAction }: DonationsTableProps)
                         </div>
                       </div>
 
+                      {/* Donor Message */}
+                      {row.message && (
+                        <div className="mt-3 space-y-1 text-sm">
+                          <p className="text-xs font-semibold text-muted-foreground uppercase flex items-center gap-1">
+                            <MessageSquareIcon className="size-3" />
+                            Donor Message
+                          </p>
+                          <p className="text-muted-foreground italic">&ldquo;{row.message}&rdquo;</p>
+                        </div>
+                      )}
+
                       {/* Row actions */}
-                      {onAction && (row.status === 'success' || row.status === 'pending') && (
+                      {onAction && (row.status === 'pending') && (
                         <div className="mt-4 flex gap-2 border-t pt-3">
-                          {row.status === 'success' && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="gap-1.5 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                onAction('mark_refunded', row.id)
-                              }}
-                            >
-                              <RotateCcwIcon className="size-3.5" />
-                              Mark Refunded
-                            </Button>
-                          )}
                           {row.status === 'pending' && (
                             <Button
                               variant="outline"
