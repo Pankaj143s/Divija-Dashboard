@@ -11,6 +11,10 @@ import {
   RotateCcwIcon,
   BanIcon,
   MessageSquareIcon,
+  PencilIcon,
+  XIcon,
+  CheckCircle2Icon,
+  LoaderCircleIcon,
 } from 'lucide-react'
 
 import {
@@ -135,6 +139,82 @@ interface DonationsTableProps {
 
 export function DonationsTable({ rows, loading, onAction }: DonationsTableProps) {
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
+
+  // ── Edit & Resend state ──────────────────────────────────────────────────
+  const [editRow, setEditRow] = useState<DonationRow | null>(null)
+  const [editForm, setEditForm] = useState({
+    name: '', pan_number: '', email: '', phone: '', address: '',
+  })
+  const [editReason, setEditReason] = useState('')
+  const [editLoading, setEditLoading] = useState(false)
+  const [editResult, setEditResult] = useState<{ success: boolean; message: string } | null>(null)
+
+  function openEditModal(row: DonationRow) {
+    setEditRow(row)
+    setEditForm({
+      name:       row.name        ?? '',
+      pan_number: row.pan_number  ?? '',
+      email:      row.email       ?? '',
+      phone:      row.phone       ?? '',
+      address:    row.address     ?? '',
+    })
+    setEditReason('')
+    setEditResult(null)
+  }
+
+  function closeEditModal() {
+    setEditRow(null)
+    setEditResult(null)
+  }
+
+  async function submitCorrection() {
+    if (!editRow) return
+    if (!editReason.trim()) {
+      setEditResult({ success: false, message: 'Please enter a reason for the correction.' })
+      return
+    }
+
+    // Build only fields that changed
+    const corrections: Record<string, string> = {}
+    if (editForm.name.trim()       !== (editRow.name        ?? '')) corrections.name       = editForm.name.trim()
+    if (editForm.pan_number.trim() !== (editRow.pan_number  ?? '')) corrections.pan_number = editForm.pan_number.trim()
+    if (editForm.email.trim()      !== (editRow.email       ?? '')) corrections.email      = editForm.email.trim()
+    if (editForm.phone.trim()      !== (editRow.phone       ?? '')) corrections.phone      = editForm.phone.trim()
+    if (editForm.address.trim()    !== (editRow.address     ?? '')) corrections.address    = editForm.address.trim()
+
+    if (Object.keys(corrections).length === 0) {
+      setEditResult({ success: false, message: 'No changes detected.' })
+      return
+    }
+
+    setEditLoading(true)
+    setEditResult(null)
+
+    try {
+      const res = await fetch('/api/admin/correct-donation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ donationId: editRow.id, corrections, reason: editReason.trim() }),
+      })
+      const data = await res.json()
+
+      if (!res.ok) {
+        setEditResult({ success: false, message: data.error || 'Something went wrong.' })
+      } else {
+        const parts: string[] = ['Documents regenerated and uploaded.']
+        if (data.emailSent)     parts.push('Email resent ✓')
+        if (data.whatsappSent)  parts.push('WhatsApp resent ✓')
+        if (!data.emailSent)    parts.push('Email failed — check logs')
+        if (!data.whatsappSent) parts.push('WhatsApp failed — check logs')
+        setEditResult({ success: true, message: parts.join(' · ') })
+      }
+    } catch {
+      setEditResult({ success: false, message: 'Network error — please try again.' })
+    } finally {
+      setEditLoading(false)
+    }
+  }
+  // ────────────────────────────────────────────────────────────────────────
 
   function toggleExpand(id: string) {
     setExpandedIds((prev) => {
@@ -318,6 +398,24 @@ export function DonationsTable({ rows, loading, onAction }: DonationsTableProps)
                           )}
                         </div>
                       )}
+
+                      {/* Edit & Resend — only for successful donations */}
+                      {row.status === 'success' && (
+                        <div className="mt-4 flex gap-2 border-t pt-3">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="gap-1.5 text-blue-600 hover:text-blue-700 hover:bg-blue-50 border-blue-200"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              openEditModal(row)
+                            }}
+                          >
+                            <PencilIcon className="size-3.5" />
+                            Edit &amp; Resend Documents
+                          </Button>
+                        </div>
+                      )}
                     </TableCell>
                   </TableRow>
                 )}
@@ -326,6 +424,167 @@ export function DonationsTable({ rows, loading, onAction }: DonationsTableProps)
           })}
         </TableBody>
       </Table>
+
+      {/* ── Edit & Resend Modal ───────────────────────────────────────────── */}
+      {editRow && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+          onClick={(e) => { if (e.target === e.currentTarget) closeEditModal() }}
+        >
+          <div className="relative w-full max-w-lg rounded-xl bg-white shadow-2xl dark:bg-gray-900 flex flex-col max-h-[90vh]">
+            {/* Header */}
+            <div className="flex items-center justify-between border-b px-6 py-4">
+              <div>
+                <h2 className="text-base font-semibold">Edit &amp; Resend Documents</h2>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Receipt #{editRow.receipt_number} · {editRow.name}
+                </p>
+              </div>
+              <button
+                onClick={closeEditModal}
+                className="rounded-md p-1 text-muted-foreground hover:bg-muted"
+                disabled={editLoading}
+                aria-label="Close"
+              >
+                <XIcon className="size-4" />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="overflow-y-auto px-6 py-4 space-y-4 text-sm">
+              <p className="text-xs text-muted-foreground bg-amber-50 border border-amber-200 rounded-md px-3 py-2 dark:bg-amber-900/20 dark:border-amber-800">
+                Correcting donor details will regenerate all three PDFs at the same URLs, update the donation record in the database, and resend the email + WhatsApp with the corrected information.
+              </p>
+
+              {/* Name */}
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Full Name</label>
+                <input
+                  type="text"
+                  value={editForm.name}
+                  onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))}
+                  className="w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-700"
+                  disabled={editLoading}
+                />
+              </div>
+
+              {/* PAN */}
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">PAN Number</label>
+                <input
+                  type="text"
+                  value={editForm.pan_number}
+                  onChange={(e) => setEditForm((f) => ({ ...f, pan_number: e.target.value.toUpperCase() }))}
+                  placeholder="ABCDE1234F"
+                  className="w-full rounded-md border px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-700"
+                  disabled={editLoading}
+                />
+              </div>
+
+              {/* Email */}
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Email</label>
+                <input
+                  type="email"
+                  value={editForm.email}
+                  onChange={(e) => setEditForm((f) => ({ ...f, email: e.target.value }))}
+                  className="w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-700"
+                  disabled={editLoading}
+                />
+              </div>
+
+              {/* Phone */}
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Phone</label>
+                <input
+                  type="text"
+                  value={editForm.phone}
+                  onChange={(e) => setEditForm((f) => ({ ...f, phone: e.target.value }))}
+                  className="w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-700"
+                  disabled={editLoading}
+                />
+              </div>
+
+              {/* Address */}
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Address</label>
+                <textarea
+                  value={editForm.address}
+                  onChange={(e) => setEditForm((f) => ({ ...f, address: e.target.value }))}
+                  rows={2}
+                  className="w-full rounded-md border px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-700"
+                  disabled={editLoading}
+                />
+              </div>
+
+              {/* Reason (required) */}
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                  Reason for Correction <span className="text-red-500">*</span>
+                </label>
+                <textarea
+                  value={editReason}
+                  onChange={(e) => setEditReason(e.target.value)}
+                  rows={2}
+                  placeholder="e.g. Donor provided wrong PAN number"
+                  className="w-full rounded-md border px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-700"
+                  disabled={editLoading}
+                />
+              </div>
+
+              {/* Result feedback */}
+              {editResult && (
+                <div className={`flex items-start gap-2 rounded-md px-3 py-2 text-xs ${
+                  editResult.success
+                    ? 'bg-emerald-50 text-emerald-800 border border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-300 dark:border-emerald-800'
+                    : 'bg-red-50 text-red-800 border border-red-200 dark:bg-red-900/20 dark:text-red-300 dark:border-red-800'
+                }`}>
+                  {editResult.success
+                    ? <CheckCircle2Icon className="size-3.5 mt-0.5 flex-shrink-0" />
+                    : <XIcon className="size-3.5 mt-0.5 flex-shrink-0" />
+                  }
+                  <span>{editResult.message}</span>
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="flex items-center justify-end gap-2 border-t px-6 py-4">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={closeEditModal}
+                disabled={editLoading}
+              >
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                className="gap-1.5 bg-blue-600 hover:bg-blue-700 text-white"
+                onClick={submitCorrection}
+                disabled={editLoading || editResult?.success === true}
+              >
+                {editLoading ? (
+                  <>
+                    <LoaderCircleIcon className="size-3.5 animate-spin" />
+                    Processing…
+                  </>
+                ) : editResult?.success ? (
+                  <>
+                    <CheckCircle2Icon className="size-3.5" />
+                    Done
+                  </>
+                ) : (
+                  <>
+                    <PencilIcon className="size-3.5" />
+                    Confirm &amp; Resend
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
