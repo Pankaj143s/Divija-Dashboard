@@ -13,7 +13,6 @@ import { type NextRequest, NextResponse } from 'next/server'
 
 export const COOKIE_NAME = 'divija_admin_session'
 const SESSION_PAYLOAD = 'divija-admin-authenticated'
-const MAX_AGE = 60 * 60 * 24 // 24 hours
 
 // ---------------------------------------------------------------------------
 // Helpers — Web Crypto API (works in both Node.js and Edge runtimes)
@@ -95,7 +94,6 @@ export async function setAdminSession(response: NextResponse): Promise<void> {
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
     path: '/',
-    maxAge: MAX_AGE,
   })
 }
 
