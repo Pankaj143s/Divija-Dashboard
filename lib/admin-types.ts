@@ -30,6 +30,9 @@ export interface DonationRow {
   itr80g_url: string | null
   thanking_letter_url: string | null
   message: string | null
+  // Source tracking — null/missing means 'website' (backward-compatible)
+  source?: string | null
+  campaign_name?: string | null
 }
 
 export interface DashboardStats {
@@ -61,6 +64,7 @@ export interface DashboardResponse {
 export interface DashboardFilters {
   q: string
   status: string
+  source: string
   from: string
   to: string
   page: number

@@ -12,6 +12,7 @@ import { supabaseAdmin } from '@/lib/supabase'
 import type { DashboardResponse, DonationRow } from '@/lib/admin-types'
 
 const ALLOWED_STATUSES = ['success', 'pending', 'abandoned', 'failed', 'refunded']
+const ALLOWED_SOURCES  = ['website', 'instagram', 'meta_ads', 'manual', 'social']
 
 const SELECT_COLUMNS = [
   'id',
@@ -41,6 +42,8 @@ const SELECT_COLUMNS = [
   'itr80g_url',
   'thanking_letter_url',
   'message',
+  'source',
+  'campaign_name',
 ].join(',')
 
 export async function GET(request: NextRequest) {
@@ -53,6 +56,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const q = searchParams.get('q')?.trim() || ''
     const status = searchParams.get('status') || ''
+    const source = searchParams.get('source') || ''
     const from = searchParams.get('from') || ''
     const to = searchParams.get('to') || ''
     const includeAllTime = searchParams.get('includeAllTime') !== 'false'
@@ -78,6 +82,18 @@ export async function GET(request: NextRequest) {
     // Status filter
     if (status && ALLOWED_STATUSES.includes(status)) {
       query = query.eq('status', status)
+    }
+
+    // Source filter — 'website' also matches rows where source IS NULL (old donations)
+    // 'social' is a virtual filter: Instagram + Meta Ads combined
+    if (source && ALLOWED_SOURCES.includes(source)) {
+      if (source === 'website') {
+        query = query.or('source.eq.website,source.is.null')
+      } else if (source === 'social') {
+        query = query.or('source.eq.instagram,source.eq.meta_ads')
+      } else {
+        query = query.eq('source', source)
+      }
     }
 
     // Date range filter
