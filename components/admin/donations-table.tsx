@@ -90,6 +90,22 @@ function isSafeUrl(url: string): boolean {
   }
 }
 
+/** Small source badge shown below donor email.
+ *  NULL / missing source defaults to 🌐 Website (backward-compatible). */
+function SourceBadge({ source }: { source?: string | null }) {
+  let emoji = '🌐'
+  let label = 'Website'
+  if (source === 'instagram')       { emoji = '📷'; label = 'Instagram' }
+  else if (source === 'meta_ads')   { emoji = '📣'; label = 'Meta Ads' }
+  else if (source === 'manual')     { emoji = '➕'; label = 'Manual' }
+  return (
+    <span className="mt-0.5 inline-flex items-center gap-1 text-[10px] leading-none text-muted-foreground/70">
+      <span>{emoji}</span>
+      <span>{label}</span>
+    </span>
+  )
+}
+
 function DocLink({
   url,
   label,
@@ -302,6 +318,7 @@ export function DonationsTable({ rows, loading, onAction }: DonationsTableProps)
                   <TableCell className="text-xs">
                     <p className="font-medium">{row.name}</p>
                     <p className="text-muted-foreground">{row.email}</p>
+                    <SourceBadge source={row.source} />
                   </TableCell>
                   <TableCell className="text-right text-xs font-medium tabular-nums">
                     {formatINR(row.amount)}

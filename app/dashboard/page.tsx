@@ -41,6 +41,7 @@ import type {
 const DEFAULT_FILTERS: DashboardFilters = {
   q: '',
   status: '',
+  source: '',
   from: '',
   to: '',
   page: 1,
@@ -87,6 +88,7 @@ export default function DashboardPage() {
     const params = new URLSearchParams()
     if (f.q) params.set('q', f.q)
     if (f.status) params.set('status', f.status)
+    if (f.source) params.set('source', f.source)
     if (f.from) params.set('from', f.from)
     if (f.to) params.set('to', f.to)
     params.set('page', String(f.page))
@@ -155,6 +157,10 @@ export default function DashboardPage() {
     setFilters((prev) => ({ ...prev, status: value === 'all' ? '' : value, page: 1 }))
   }
 
+  function handleSourceChange(value: string) {
+    setFilters((prev) => ({ ...prev, source: value === 'all' ? '' : value, page: 1 }))
+  }
+
   function handleDateChange(from: string, to: string) {
     setFilters((prev) => ({ ...prev, from, to, page: 1 }))
   }
@@ -200,6 +206,7 @@ export default function DashboardPage() {
 
     if (filters.q) params.set('q', filters.q)
     if (filters.status) params.set('status', filters.status)
+    if (filters.source) params.set('source', filters.source)
     if (filters.from) params.set('from', filters.from)
     if (filters.to) params.set('to', filters.to)
 
@@ -210,7 +217,7 @@ export default function DashboardPage() {
   // Derived
   // -------------------------------------------------------------------------
   const hasDateFilter = !!(filters.from || filters.to)
-  const hasAnyFilter = !!(filters.q || filters.status || filters.from || filters.to)
+  const hasAnyFilter = !!(filters.q || filters.status || filters.source || filters.from || filters.to)
   const totalPages = pagination?.pages ?? 1
   const currentPage = pagination?.page ?? 1
 
@@ -310,6 +317,19 @@ export default function DashboardPage() {
               <SelectItem value="failed">Failed</SelectItem>
               <SelectItem value="refunded">Refunded</SelectItem>
               <SelectItem value="abandoned">Abandoned</SelectItem>
+            </SelectContent>
+          </Select>
+
+          {/* Source */}
+          <Select value={filters.source || 'all'} onValueChange={handleSourceChange}>
+            <SelectTrigger size="sm" className="h-9 w-[140px]">
+              <SelectValue placeholder="Source" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Sources</SelectItem>
+              <SelectItem value="website">🌐 Website</SelectItem>
+              <SelectItem value="instagram">📷 Instagram</SelectItem>
+              <SelectItem value="manual">➕ Manual</SelectItem>
             </SelectContent>
           </Select>
 

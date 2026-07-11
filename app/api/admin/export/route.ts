@@ -49,7 +49,20 @@ const DB_FIELDS = [
   'receipt_url',
   'itr80g_url',
   'thanking_letter_url',
+  'source',
+  'campaign_name',
 ].join(',')
+
+/** Convert raw source to human-readable label for Excel export.
+ *  NULL / missing source = 'Website' (old records are backward-compatible). */
+function sourceToLabel(source: unknown): string {
+  switch (source) {
+    case 'instagram': return 'Instagram'
+    case 'meta_ads':  return 'Meta Ads'
+    case 'manual':    return 'Manual'
+    default:          return 'Website'
+  }
+}
 
 function formatDate(iso: string): string {
   try {
@@ -171,6 +184,8 @@ export async function GET(request: NextRequest) {
         receiptUrl: (r.receipt_url as string) || '',
         itr80gUrl: (r.itr80g_url as string) || '',
         thankingLetterUrl: (r.thanking_letter_url as string) || '',
+        source: sourceToLabel(r.source),
+        campaignName: (r.campaign_name as string) || '',
       }
     })
 
@@ -186,7 +201,7 @@ export async function GET(request: NextRequest) {
     const worksheet = workbook.addWorksheet('Donations')
     worksheet.properties.defaultRowHeight = 20
 
-    worksheet.mergeCells('A1:O1')
+    worksheet.mergeCells('A1:Q1')
     worksheet.getCell('A1').value = `Report Downloaded: ${formatDate(new Date().toISOString())}`
     worksheet.getCell('A1').font = { bold: true, size: 11, color: { argb: 'FFFFFFFF' } }
     worksheet.getCell('A1').fill = {
@@ -213,6 +228,8 @@ export async function GET(request: NextRequest) {
       'Receipt URL',
       '80G URL',
       'Thank Letter URL',
+      'Source',
+      'Campaign Name',
     ]
     worksheet.columns = [
       { key: 'serialNumber', width: 9 },
@@ -230,6 +247,8 @@ export async function GET(request: NextRequest) {
       { key: 'receiptUrl', width: 40 },
       { key: 'itr80gUrl', width: 40 },
       { key: 'thankingLetterUrl', width: 40 },
+      { key: 'source', width: 14 },
+      { key: 'campaignName', width: 28 },
     ]
 
     worksheet.insertRow(tableHeaderRow, tableHeaders)
