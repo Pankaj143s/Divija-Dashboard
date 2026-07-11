@@ -329,8 +329,6 @@ export default function DashboardPage() {
               <SelectItem value="all">All Sources</SelectItem>
               <SelectItem value="website">🌐 Website</SelectItem>
               <SelectItem value="instagram">📷 Instagram</SelectItem>
-              <SelectItem value="meta_ads">📣 Meta Ads</SelectItem>
-              <SelectItem value="social">📱 Instagram + Meta</SelectItem>
               <SelectItem value="manual">➕ Manual</SelectItem>
             </SelectContent>
           </Select>
